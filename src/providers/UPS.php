@@ -228,6 +228,16 @@ class UPS extends Provider
             $shipToAddress = $shipTo->getAddress();
             $shipToAddress->setPostalCode($order->shippingAddress->zipCode);
 
+            /**
+             * Start Happy Cog Mod for HLRB
+             *
+             * This mod refrains from sending package dimensions to UPS and
+             * relies on weight only. It also splits into multiple packages
+             * of 16, rather than one package. Ordering a large quantity
+             * with the old one-package algorithm, can exceed the UPS API
+             * per-package weight limit.
+             */
+/*
             $package = new Package();
             $package->getPackagingType()->setCode(PackagingType::PT_PACKAGE);
             $package->getPackageWeight()->setWeight($dimensions['weight']);
@@ -248,6 +258,50 @@ class UPS extends Provider
             $package->setDimensions($packageDimensions);
 
             $shipment->addPackage($package);
+*/
+            $totalItems = 0;
+
+            foreach ($order->lineItems as $lineItem) {
+                if ($lineItem->getPurchasable()->getIsShippable()) {
+                    $totalItems += $lineItem->qty;
+                }
+            }
+
+            if ($totalItems) {
+                $weightPerLineItem = $dimensions['weight'] / $totalItems;
+
+                while ($totalItems > 0) {
+                    $currentNumberOfItems = $totalItems > 16 ? 16 : $totalItems;
+
+                    $packageWeight = $currentNumberOfItems * $weightPerLineItem;
+
+                    $package = new Package();
+                    $package->getPackagingType()->setCode(PackagingType::PT_PACKAGE);
+                    $package->getPackageWeight()->setWeight($packageWeight);
+
+                    $weightUnit = new UnitOfMeasurement;
+                    $weightUnit->setCode(UnitOfMeasurement::UOM_LBS);
+                    $package->getPackageWeight()->setUnitOfMeasurement($weightUnit);
+
+                    $shipment->addPackage($package);
+
+                    $totalItems -= $currentNumberOfItems;
+                }
+            } else {
+                $package = new Package();
+                $package->getPackagingType()->setCode(PackagingType::PT_PACKAGE);
+                $package->getPackageWeight()->setWeight(0);
+
+                $weightUnit = new UnitOfMeasurement;
+                $weightUnit->setCode(UnitOfMeasurement::UOM_LBS);
+                $package->getPackageWeight()->setUnitOfMeasurement($weightUnit);
+
+                $shipment->addPackage($package);
+            }
+
+            /**
+             * End Happy Cog Mod for HLRB
+             **/
 
             $negotiatedRates = $this->settings['negotiatedRates'] ?? '';
             $accountNumber = $this->settings['accountNumber'] ?? '';
