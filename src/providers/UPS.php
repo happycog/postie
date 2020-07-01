@@ -259,6 +259,8 @@ class UPS extends Provider
 
             $shipment->addPackage($package);
 */
+            $itemsPerBox = 50;
+
             $totalItems = 0;
 
             foreach ($order->lineItems as $lineItem) {
@@ -271,7 +273,7 @@ class UPS extends Provider
                 $weightPerLineItem = $dimensions['weight'] / $totalItems;
 
                 while ($totalItems > 0) {
-                    $currentNumberOfItems = $totalItems > 16 ? 16 : $totalItems;
+                    $currentNumberOfItems = $totalItems > $itemsPerBox ? $itemsPerBox : $totalItems;
 
                     $packageWeight = $currentNumberOfItems * $weightPerLineItem;
 
